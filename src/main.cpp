@@ -8,6 +8,12 @@
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
+// PWM Configuration
+#define PWM_PIN 18
+#define PWM_CHANNEL 0
+#define PWM_FREQUENCY 5000
+#define PWM_RESOLUTION 8
+
 BLEServer *pServer = NULL;
 BLECharacteristic *pCharacteristic = NULL;
 bool deviceConnected = false;
@@ -34,6 +40,27 @@ class MyCharacteristicCallbacks: public BLECharacteristicCallbacks {
         for (int i = 0; i < rxValue.length(); i++)
           Serial.print(rxValue[i]);
         Serial.println();
+
+        // Convert received value to PWM duty cycle (0-255)
+        uint8_t pwmValue = 0;
+        
+        // Try to parse as integer
+        if (rxValue.length() == 1) {
+          // Single digit (0-9)
+          pwmValue = (uint8_t)(rxValue[0] - '0');
+          pwmValue = pwmValue * 25; // Scale 0-9 to 0-225
+        } else {
+          // Parse as full number (0-255)
+          pwmValue = (uint8_t)std::stoi(rxValue);
+        }
+
+        // Constrain value to 0-255
+        if (pwmValue > 255) pwmValue = 255;
+
+        // Set PWM duty cycle
+        ledcWrite(PWM_CHANNEL, pwmValue);
+        Serial.print("PWM set to: ");
+        Serial.println(pwmValue);
       }
     }
 };
@@ -43,6 +70,12 @@ void setup() {
   delay(1000);
   
   Serial.println("Starting BLE work!");
+
+  // Configure PWM on GPIO 18
+  ledcSetup(PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcAttachPin(PWM_PIN, PWM_CHANNEL);
+  ledcWrite(PWM_CHANNEL, 0); // Start with PWM off
+  Serial.println("PWM initialized on GPIO 18");
 
   // Create the BLE Device
   BLEDevice::init("EspCode");
